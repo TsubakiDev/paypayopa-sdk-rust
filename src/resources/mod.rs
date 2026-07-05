@@ -1,3 +1,5 @@
+//! Resource clients and request helpers for PayPay OPA API groups.
+
 mod account;
 mod cashback;
 mod code;
@@ -19,7 +21,12 @@ pub use pending::Pending;
 pub use preauth::Preauth;
 pub use user::User;
 
+/// Converts JSON-like input into an optional request body.
+///
+/// Resource methods use this trait so callers can pass owned [`Value`],
+/// borrowed [`Value`], or `Option<Value>` without manual conversion.
 pub trait IntoOptionalValue {
+    /// Converts the input into an optional JSON request body.
     fn into_optional_value(self) -> Option<Value>;
 }
 
@@ -41,7 +48,12 @@ impl IntoOptionalValue for &Value {
     }
 }
 
+/// Converts string-like input into an optional identifier.
+///
+/// Resource methods use this trait so callers can pass owned strings,
+/// borrowed strings, or optional strings for PayPay identifiers.
 pub trait IntoOptionalString {
+    /// Converts the input into an optional identifier string.
     fn into_optional_string(self) -> Option<String>;
 }
 

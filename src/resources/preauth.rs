@@ -1,3 +1,5 @@
+//! Preauthorization resource client.
+
 use std::sync::Arc;
 
 use crate::client::ClientInner;
@@ -9,6 +11,7 @@ use crate::resources::{
 };
 use crate::Value;
 
+/// Client for PayPay preauthorization APIs.
 #[derive(Clone)]
 pub struct Preauth {
     inner: Arc<ClientInner>,
@@ -19,6 +22,11 @@ impl Preauth {
         Self { inner }
     }
 
+    /// Creates a preauthorized payment.
+    ///
+    /// The request body must include `merchantPaymentId`, `userAuthorizationId`,
+    /// and a valid `amount`. When `expiresAt` is present, it must be an integer
+    /// epoch timestamp.
     pub fn pre_authorize_create<D: IntoOptionalValue>(&self, data: D) -> Result<Value> {
         let mut data = optional_data(data);
         add_requested_at(&mut data)?;

@@ -1,18 +1,29 @@
+//! Error types returned by the PayPay OPA SDK.
+
 use std::fmt;
 
+/// Convenient result alias used by SDK methods.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Error type for SDK validation, signing, encoding, and HTTP failures.
 #[derive(Debug)]
 pub enum Error {
+    /// API credentials were required but not available.
     MissingAuth,
+    /// Request validation failed before sending the API call.
     Validation(String),
+    /// The underlying HTTP client returned an error.
     Http(reqwest::Error),
+    /// JSON serialization or deserialization failed.
     Json(serde_json::Error),
+    /// JWT encoding or decoding failed.
     Jwt(jsonwebtoken::errors::Error),
+    /// Base64 decoding failed.
     Base64(base64::DecodeError),
 }
 
 impl Error {
+    /// Creates a validation error with the provided message.
     pub fn validation(message: impl Into<String>) -> Self {
         Self::Validation(message.into())
     }
@@ -57,18 +68,21 @@ impl From<base64::DecodeError> for Error {
     }
 }
 
+/// Error returned when PayPay OPA responds with a server-side failure.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ServerError {
     message: Option<String>,
 }
 
 impl ServerError {
+    /// Creates a server error with a response message.
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: Some(message.into()),
         }
     }
 
+    /// Creates a server error without a response message.
     pub fn without_message() -> Self {
         Self { message: None }
     }
@@ -91,18 +105,21 @@ impl fmt::Display for ServerError {
 
 impl std::error::Error for ServerError {}
 
+/// Error returned when webhook or response signature verification fails.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SignatureVerificationError {
     message: Option<String>,
 }
 
 impl SignatureVerificationError {
+    /// Creates a signature verification error with a message.
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: Some(message.into()),
         }
     }
 
+    /// Creates a signature verification error without a response message.
     pub fn without_message() -> Self {
         Self { message: None }
     }

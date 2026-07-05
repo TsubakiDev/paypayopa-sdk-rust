@@ -1,3 +1,5 @@
+//! Cashback resource client.
+
 use std::sync::Arc;
 
 use crate::client::ClientInner;
@@ -9,6 +11,7 @@ use crate::resources::{
 };
 use crate::Value;
 
+/// Client for PayPay cashback and cashback reversal APIs.
 #[derive(Clone)]
 pub struct Cashback {
     inner: Arc<ClientInner>,
@@ -19,6 +22,11 @@ impl Cashback {
         Self { inner }
     }
 
+    /// Creates a cashback request.
+    ///
+    /// The request body must include `merchantCashbackId`,
+    /// `userAuthorizationId`, `requestedAt`, `walletType`, and an `amount`
+    /// object containing `amount` and `currency`.
     pub fn give_cashback<D: IntoOptionalValue>(&self, data: D) -> Result<Value> {
         let data = optional_data(data);
         require_field(&data, "merchantCashbackId")?;
@@ -33,6 +41,7 @@ impl Cashback {
         )
     }
 
+    /// Retrieves cashback details by merchant cashback ID.
     pub fn check_cashback_detail<S: IntoOptionalString>(
         &self,
         merchant_cashback_id: S,
@@ -42,6 +51,11 @@ impl Cashback {
         self.inner.get(&url, None, ApiNames::GET_CASHBACK_DETAILS)
     }
 
+    /// Creates a cashback reversal request.
+    ///
+    /// The request body must include `merchantCashbackReversalId`,
+    /// `merchantCashbackId`, `requestedAt`, and an `amount` object containing
+    /// `amount` and `currency`.
     pub fn reverse_cashback<D: IntoOptionalValue>(&self, data: D) -> Result<Value> {
         let data = optional_data(data);
         require_field(&data, "merchantCashbackReversalId")?;
@@ -55,6 +69,10 @@ impl Cashback {
         )
     }
 
+    /// Retrieves cashback reversal details.
+    ///
+    /// Both the merchant cashback reversal ID and original merchant cashback ID
+    /// are required.
     pub fn check_cashback_reversal_detail<R, C>(
         &self,
         merchant_cashback_reversal_id: R,

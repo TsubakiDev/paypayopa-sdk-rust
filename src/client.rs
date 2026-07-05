@@ -1,3 +1,5 @@
+//! Client construction, authentication, request signing, and low-level HTTP helpers.
+
 use std::sync::{Arc, RwLock};
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -18,13 +20,17 @@ use crate::resources::{Account, Cashback, Code, Payment, Pending, Preauth, User}
 
 type HmacSha256 = Hmac<Sha256>;
 
+/// PayPay OPA API credentials.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Auth {
+    /// Merchant API key.
     pub api_key: String,
+    /// Merchant API secret used to sign requests.
     pub api_secret: String,
 }
 
 impl Auth {
+    /// Creates a new credentials value from an API key and secret.
     pub fn new(api_key: impl Into<String>, api_secret: impl Into<String>) -> Self {
         Self {
             api_key: api_key.into(),
@@ -33,11 +39,16 @@ impl Auth {
     }
 }
 
+/// Configuration options used when creating a [`Client`].
 #[derive(Clone)]
 pub struct ClientOptions {
+    /// Uses the production PayPay OPA gateway when no custom `base_url` is set.
     pub production_mode: bool,
+    /// Uses the performance test PayPay OPA gateway when no custom `base_url` is set.
     pub perf_mode: bool,
+    /// Overrides the default gateway base URL.
     pub base_url: Option<String>,
+    /// Custom blocking HTTP client to use for requests.
     pub http_client: Option<HttpClient>,
 }
 
@@ -53,10 +64,12 @@ impl Default for ClientOptions {
 }
 
 impl ClientOptions {
+    /// Creates options for the PayPay OPA sandbox gateway.
     pub fn sandbox() -> Self {
         Self::default()
     }
 
+    /// Creates options for the PayPay OPA production gateway.
     pub fn production() -> Self {
         Self {
             production_mode: true,
@@ -64,6 +77,7 @@ impl ClientOptions {
         }
     }
 
+    /// Creates options for the PayPay OPA performance test gateway.
     pub fn perf() -> Self {
         Self {
             perf_mode: true,
@@ -71,6 +85,7 @@ impl ClientOptions {
         }
     }
 
+    /// Creates options with an explicit gateway base URL.
     pub fn with_base_url(base_url: impl Into<String>) -> Self {
         Self {
             base_url: Some(base_url.into()),
@@ -79,15 +94,27 @@ impl ClientOptions {
     }
 }
 
+/// Blocking PayPay OPA API client.
+///
+/// A client owns reusable resource handles for the major PayPay OPA API groups.
+/// Callers may use the public fields directly, such as `client.payment`, or the
+/// accessor methods, such as [`Client::payment`].
 #[derive(Clone)]
 pub struct Client {
     inner: Arc<ClientInner>,
+    /// Dynamic QR code APIs.
     pub code: Code,
+    /// Payment, refund, capture, and subscription payment APIs.
     pub payment: Payment,
+    /// Preauthorization APIs.
     pub preauth: Preauth,
+    /// Pending payment request order APIs.
     pub pending: Pending,
+    /// Cashback and cashback reversal APIs.
     pub cashback: Cashback,
+    /// Account linking QR session APIs.
     pub account: Account,
+    /// User authorization APIs.
     pub user: User,
 }
 
@@ -125,6 +152,7 @@ struct JwtClaims {
 }
 
 impl Client {
+    /// Creates a sandbox client from an `(api_key, api_secret)` pair.
     pub fn new<K, S>(auth: (K, S)) -> Self
     where
         K: Into<String>,
@@ -133,6 +161,7 @@ impl Client {
         Self::with_options(auth, ClientOptions::default())
     }
 
+    /// Creates a client from an `(api_key, api_secret)` pair and explicit options.
     pub fn with_options<K, S>(auth: (K, S), options: ClientOptions) -> Self
     where
         K: Into<String>,
@@ -160,50 +189,62 @@ impl Client {
         }
     }
 
+    /// Returns the dynamic QR code resource client.
     pub fn code(&self) -> &Code {
         &self.code
     }
 
+    /// Returns the payment resource client.
     pub fn payment(&self) -> &Payment {
         &self.payment
     }
 
+    /// Returns the preauthorization resource client.
     pub fn preauth(&self) -> &Preauth {
         &self.preauth
     }
 
+    /// Returns the pending payment resource client.
     pub fn pending(&self) -> &Pending {
         &self.pending
     }
 
+    /// Returns the cashback resource client.
     pub fn cashback(&self) -> &Cashback {
         &self.cashback
     }
 
+    /// Returns the account linking resource client.
     pub fn account(&self) -> &Account {
         &self.account
     }
 
+    /// Returns the user authorization resource client.
     pub fn user(&self) -> &User {
         &self.user
     }
 
+    /// Returns this crate's package version.
     pub fn get_version(&self) -> &'static str {
         env!("CARGO_PKG_VERSION")
     }
 
+    /// Returns the base URL selected for this client.
     pub fn base_url(&self) -> &str {
         &self.inner.base_url
     }
 
+    /// Returns whether this client was configured for production mode.
     pub fn production_mode(&self) -> bool {
         self.inner.production_mode
     }
 
+    /// Returns whether this client was configured for performance test mode.
     pub fn perf_mode(&self) -> bool {
         self.inner.perf_mode
     }
 
+    /// Returns the merchant ID sent in the `X-ASSUME-MERCHANT` header.
     pub fn assume_merchant(&self) -> String {
         self.inner
             .assume_merchant
@@ -212,6 +253,9 @@ impl Client {
             .unwrap_or_default()
     }
 
+    /// Sets the merchant ID sent in the `X-ASSUME-MERCHANT` header.
+    ///
+    /// Empty values are ignored.
     pub fn set_assume_merchant(&self, merchant: impl AsRef<str>) {
         let merchant = merchant.as_ref();
         if merchant.is_empty() {
@@ -222,6 +266,10 @@ impl Client {
         }
     }
 
+    /// Encodes a PayPay account-linking JWT.
+    ///
+    /// The `secret` must be base64 encoded. The generated token expires five
+    /// minutes after it is created.
     pub fn encode_jwt(
         &self,
         secret: &str,
@@ -256,6 +304,10 @@ impl Client {
         )?)
     }
 
+    /// Decodes a PayPay account-linking JWT.
+    ///
+    /// The `secret` must be base64 encoded. The returned tuple contains
+    /// `(user_authorization_id, reference_id)`.
     pub fn decode_jwt(
         &self,
         secret: &str,
@@ -272,6 +324,7 @@ impl Client {
         Ok((claims.user_authorization_id, claims.reference_id))
     }
 
+    /// Builds a PayPay OPA `Authorization` header with a generated nonce and timestamp.
     pub fn auth_header(
         &self,
         api_key: &str,
@@ -293,6 +346,9 @@ impl Client {
         )
     }
 
+    /// Builds a PayPay OPA `Authorization` header with explicit nonce and timestamp.
+    ///
+    /// This is useful for deterministic tests and for reproducing signatures.
     pub fn auth_header_with_nonce_timestamp(
         api_key: &str,
         api_secret: &str,
@@ -330,22 +386,27 @@ impl Client {
         format!("hmac OPA-Auth:{api_key}:{signature}:{nonce}:{timestamp}:{body_hash}")
     }
 
+    /// Sends a signed GET request to a PayPay OPA resource path.
     pub fn get(&self, path: &str, params: Option<&Value>, api_id: &str) -> Result<Value> {
         self.inner.get(path, params, api_id)
     }
 
+    /// Sends a signed POST request to a PayPay OPA resource path.
     pub fn post(&self, path: &str, data: Option<&Value>, api_id: &str) -> Result<Value> {
         self.inner.post(path, data, api_id)
     }
 
+    /// Sends a signed PATCH request to a PayPay OPA resource path.
     pub fn patch(&self, path: &str, data: Option<&Value>, api_id: &str) -> Result<Value> {
         self.inner.patch(path, data, api_id)
     }
 
+    /// Sends a signed DELETE request to a PayPay OPA resource path.
     pub fn delete(&self, path: &str, data: Option<&Value>, api_id: &str) -> Result<Value> {
         self.inner.delete(path, data, api_id)
     }
 
+    /// Sends a signed PUT request to a PayPay OPA resource path.
     pub fn put(&self, path: &str, data: Option<&Value>, api_id: &str) -> Result<Value> {
         self.inner.put(path, data, api_id)
     }

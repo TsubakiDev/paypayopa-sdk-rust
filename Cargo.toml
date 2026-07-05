@@ -1,7 +1,8 @@
 [package]
 name = "paypayopa-sdk-rust"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
+authors = ["Tsubaki"]
 description = "Rust port of the PayPay OPA SDK"
 license = "Apache-2.0"
 repository = "https://github.com/paypay/paypayopa-sdk-python"

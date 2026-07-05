@@ -13,8 +13,7 @@ The crate keeps the same PayPay API coverage as the Python package while using R
 
 ```toml
 [dependencies]
-paypayopa = { package = "paypayopa-sdk-rust", path = "." }
-serde_json = "1"
+paypayopa-sdk-rust = "<version>"
 ```
 
 ## Usage
